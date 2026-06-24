@@ -1,8 +1,16 @@
 const fastify = require("fastify")({ logger: true });
+const cors = require("@fastify/cors");
 const { PORT } = require("./config/env");
 const { connectDB } = require("./db/connection");
 const runSeeder = require("./seedData/main.seed");
 const authRoutes = require("./routes/auth.routes");
+
+// Register CORS
+fastify.register(cors, {
+  origin: true,
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+});
 
 // Register Auth Routes
 fastify.register(authRoutes, { prefix: "/api/auth" });
@@ -18,13 +26,7 @@ fastify.setErrorHandler((error, request, reply) => {
 
 const start = async () => {
   try {
-
     await connectDB();
-
-
-    // await runSeeder();
-
-
     await fastify.listen({ port: parseInt(PORT, 10), host: "0.0.0.0" });
     console.log(`Server is running on port ${PORT}`);
   } catch (err) {
@@ -32,5 +34,11 @@ const start = async () => {
     process.exit(1);
   }
 };
+
+// ==========================================
+// DATABASE SEEDING
+// To seed the database, uncomment the line below:
+// connectDB().then(() => runSeeder());
+// ==========================================
 
 start();

@@ -1,4 +1,4 @@
-const { pool } = require("../db/connection");
+const { prisma } = require("../db/connection");
 
 class User {
   /**
@@ -8,20 +8,20 @@ class User {
    */
   static async findOne({ email }) {
     if (!email) return null;
-    const query = "SELECT * FROM users WHERE email = $1 LIMIT 1";
-    const res = await pool.query(query, [email.toLowerCase()]);
+    const user = await prisma.user.findUnique({
+      where: { email: email.toLowerCase() },
+    });
     
-    if (res.rows.length === 0) return null;
+    if (!user) return null;
 
-    const user = res.rows[0];
     return {
       _id: user.id, // Mapped to _id to keep JWT payload and controller compatibility
       name: user.name,
       email: user.email,
       password: user.password,
       role: user.role,
-      createdAt: user.created_at,
-      updatedAt: user.updated_at,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
     };
   }
 
@@ -31,13 +31,24 @@ class User {
    * @returns {Promise<Object>} Created user details
    */
   static async create({ name, email, password, role = "Buyer" }) {
-    const query = `
-      INSERT INTO users (name, email, password, role)
-      VALUES ($1, $2, $3, $4)
-      RETURNING id as "_id", name, email, password, role, created_at as "createdAt", updated_at as "updatedAt"
-    `;
-    const res = await pool.query(query, [name, email.toLowerCase(), password, role]);
-    return res.rows[0];
+    const user = await prisma.user.create({
+      data: {
+        name,
+        email: email.toLowerCase(),
+        password,
+        role,
+      },
+    });
+
+    return {
+      _id: user.id,
+      name: user.name,
+      email: user.email,
+      password: user.password,
+      role: user.role,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    };
   }
 
   /**
@@ -49,14 +60,22 @@ class User {
    * @returns {Promise<Object>} Updated user details
    */
   static async updateCredentials(email, password, role, name) {
-    const query = `
-      UPDATE users 
-      SET password = $1, role = $2, name = $3, updated_at = NOW() 
-      WHERE email = $4
-      RETURNING id as "_id", name, email, password, role
-    `;
-    const res = await pool.query(query, [password, role, name, email.toLowerCase()]);
-    return res.rows[0];
+    const user = await prisma.user.update({
+      where: { email: email.toLowerCase() },
+      data: {
+        password,
+        role,
+        name,
+      },
+    });
+
+    return {
+      _id: user.id,
+      name: user.name,
+      email: user.email,
+      password: user.password,
+      role: user.role,
+    };
   }
 
   /**
@@ -66,13 +85,17 @@ class User {
    * @returns {Promise<Object>}
    */
   static async getOrCreateSellerProfile(userId, shopName = "") {
-    const checkQuery = "SELECT * FROM sellers WHERE user_id = $1";
-    const checkRes = await pool.query(checkQuery, [userId]);
-    if (checkRes.rows.length > 0) return checkRes.rows[0];
+    const existing = await prisma.seller.findUnique({
+      where: { userId },
+    });
+    if (existing) return existing;
 
-    const insertQuery = "INSERT INTO sellers (user_id, shop_name) VALUES ($1, $2) RETURNING *";
-    const insertRes = await pool.query(insertQuery, [userId, shopName]);
-    return insertRes.rows[0];
+    return await prisma.seller.create({
+      data: {
+        userId,
+        shopName,
+      },
+    });
   }
 
   /**
@@ -82,13 +105,17 @@ class User {
    * @returns {Promise<Object>}
    */
   static async getOrCreateBuyerProfile(userId, address = "") {
-    const checkQuery = "SELECT * FROM buyers WHERE user_id = $1";
-    const checkRes = await pool.query(checkQuery, [userId]);
-    if (checkRes.rows.length > 0) return checkRes.rows[0];
+    const existing = await prisma.buyer.findUnique({
+      where: { userId },
+    });
+    if (existing) return existing;
 
-    const insertQuery = "INSERT INTO buyers (user_id, address) VALUES ($1, $2) RETURNING *";
-    const insertRes = await pool.query(insertQuery, [userId, address]);
-    return insertRes.rows[0];
+    return await prisma.buyer.create({
+      data: {
+        userId,
+        address,
+      },
+    });
   }
 }
 
